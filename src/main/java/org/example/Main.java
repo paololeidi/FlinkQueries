@@ -23,6 +23,7 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.time.*;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.Iterator;
 
 public class Main {
@@ -69,63 +70,72 @@ public class Main {
         inputTable2.printSchema();
         tableEnv.createTemporaryView("InputTable", inputTable2);
 
-        //Query 1:  Write a continuous query that emits the max stress for each arm.
-        Table windowedTable_1 = tableEnv.sqlQuery("SELECT id, max(stressLevel) as max_stress from InputTable group by id");
+        ArrayList<Table> tableList = new ArrayList<>();
 
+        Table table1 = tableEnv.sqlQuery("""
+                SELECT window_start, window_end, avg(stressLevel) as avg_stress
+                FROM table(TUMBLE(table InputTable, descriptor(ts), INTERVAL '10' seconds))
+                GROUP BY window_start, window_end
+                """);
+        tableList.add(table1);
 
-        //Query 2:  Write a continuous query that emits the max stress for each arm every 10 seconds
-        Table windowedTable_2 = tableEnv.sqlQuery("SELECT window_start, window_end, id, max(stressLevel) as max_stress" +
-                "FROM table(TUMBLE(table InputTable, descriptor(ts), INTERVAL '10' seconds)) group by window_start, window_end, id");
+        Table table2 = tableEnv.sqlQuery("""
+                SELECT window_start, window_end, avg(stressLevel) as avg_stress
+                FROM table(HOP(table InputTable, descriptor(ts), INTERVAL '5' seconds, INTERVAL '10' seconds))
+                GROUP BY window_start, window_end
+                """);
+        tableList.add(table2);
 
-        /*
-        //Query 3: A continuous query that emits the average stress level between a pick (status==goodGrasped) and a place (status==placingGood).
-        Table windowedTable_3 = tableEnv.sqlQuery("SELECT A.id,A.ts, A.window_start, A.window_end, (A.stress_level+B.stress_level)/2 as Avg_stress_level " +
-                "from (select * from table(HOP(table InputTable, descriptor(ts), INTERVAL '5' seconds, interval '10' seconds))) A " +
-                "full join (select * from table(HOP(table InputTable, descriptor(ts), INTERVAL '5' seconds, interval '10' seconds))) B " +
-                "on A.id = B.id and A.window_start = B.window_start and A.window_end = B.window_end " +
-                "where A.status = 'good grasped' and B.status = 'placing a good' and A.ts < B.ts");
+        Table table3 = tableEnv.sqlQuery("""
+                SELECT window_start, window_end,  avg(stressLevel) as avg_stress
+                FROM table(HOP(table InputTable, descriptor(ts), INTERVAL '1' seconds, INTERVAL '10' seconds))
+                GROUP BY window_start, window_end
+                """);
+        tableList.add(table3);
 
-         */
+        Table table4 = tableEnv.sqlQuery("""
+                SELECT window_start, window_end, id, max(stressLevel) as max_stress
+                FROM table(TUMBLE(table InputTable, descriptor(ts), INTERVAL '10' seconds))
+                GROUP BY window_start, window_end, id
+                """);
+        tableList.add(table4);
 
+        Table table5 = tableEnv.sqlQuery("""
+                SELECT window_start, window_end, id, max(stressLevel) as max_stress
+                FROM table(HOP(table InputTable, descriptor(ts), INTERVAL '5' seconds, INTERVAL '10' seconds))
+                GROUP BY window_start, window_end, id
+                """);
+        tableList.add(table5);
 
-        //Query 3: A continuous query that returns the robotic arms that:
-        //in less than 10 second,
-        //picked a good while safely operating,
-        //moved it while the controller was raising a warning, and
-        //placed it while safely operating again.
+        Table table6 = tableEnv.sqlQuery("""
+                SELECT window_start, window_end, id, max(stressLevel) as max_stress
+                FROM table(HOP(table InputTable, descriptor(ts), INTERVAL '1' seconds, INTERVAL '10' seconds))
+                GROUP BY window_start, window_end, id
+                """);
+        tableList.add(table6);
 
-        //Query 4: A continuous query that monitors the results of the previous one (i.e., Q3)
-        //and counts how many times each robotic arm is present in the stream over a window of 10 seconds updating the counting every 2 seconds.
+/*
+        for (int i = 1; i < tableList.size(); i++) {
+            DataStream<Row> resultStream = tableEnv.toDataStream(tableList.get(i));
+            DataStream<String> outputStream = resultStream.map(Row::toString);
+            //resultStream.print();
+            Iterator<String> myOutput = DataStreamUtils.collect(outputStream);
 
+            writeToFile("output"+i+".csv",myOutput);
+        }
 
-        DataStream<Row> resultStream = tableEnv.toDataStream(windowedTable_2);
+ */
+
+        // no ciclo for per questioni di timing con il risultato delle query
+        int i=0;
+        DataStream<Row> resultStream = tableEnv.toDataStream(tableList.get(i));
         DataStream<String> outputStream = resultStream.map(Row::toString);
         //resultStream.print();
         Iterator<String> myOutput = DataStreamUtils.collect(outputStream);
 
-        for (Iterator<String> it = myOutput; it.hasNext(); ) {
-            String o = it.next();
-            o = o.replace("+", "")
-                    .replace(" ", "")
-                    .replace("I", "")
-                    .replace("T", " ")
-                    .replace("[", "")
-                    .replace("]", "");
-            System.out.println(o);
+        writeToFile("output"+String.valueOf(i+1)+".csv",myOutput);
 
-            try {
-                FileWriter csvWriter = new FileWriter("output.csv",true);
-                csvWriter.append(o); // Writing the transformed string to the CSV file
-                csvWriter.append("\n");
-                csvWriter.flush();
-                csvWriter.close();
-            } catch (IOException e) {
-                System.out.println("An error occurred while writing to the file: " + e.getMessage());
-            }
-             // Adding a newline after each entry
-        }
-
-        final FileSink<String> sink = FileSink
+        /*final FileSink<String> sink = FileSink
                 .forRowFormat(new Path("output"), new SimpleStringEncoder<String>("UTF-8"))
                 .withRollingPolicy(
                         DefaultRollingPolicy.builder()
@@ -138,6 +148,36 @@ public class Main {
         outputStream.sinkTo(sink);
 
         env.execute("test");
+         */
+    }
+
+    private static void writeToFile(String filename, Iterator<String> myOutput) {
+        for (Iterator<String> it = myOutput; it.hasNext(); ) {
+            String o = it.next();
+            o = formatString(o);
+            System.out.println(o);
+
+            try {
+                FileWriter csvWriter = new FileWriter(filename,true);
+                csvWriter.append(o); // Writing the transformed string to the CSV file
+                csvWriter.append("\n");
+                csvWriter.flush();
+                csvWriter.close();
+            } catch (IOException e) {
+                System.out.println("An error occurred while writing to the file: " + e.getMessage());
+            }
+             // Adding a newline after each entry
+        }
+    }
+
+    private static String formatString(String o) {
+        o = o.replace("+", "")
+                .replace(" ", "")
+                .replace("I", "")
+                .replace("T", " ")
+                .replace("[", "")
+                .replace("]", "");
+        return o;
     }
 
     public static class Event {
