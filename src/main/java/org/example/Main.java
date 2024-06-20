@@ -74,7 +74,7 @@ public class Main {
             ZonedDateTime zonedDateTime = localDateTime.atZone(ZoneId.of("Europe/Paris"));
             Instant ts = zonedDateTime.toInstant();
             int id = Integer.parseInt(values[1]);
-            double weight = Double.parseDouble(values[2]);
+            double weight = Math.round(Double.parseDouble(values[2]) * 100.0) / 100.0;
             return new WeightEvent(id, weight, ts);
         });
 
@@ -139,7 +139,7 @@ public class Main {
                 SELECT CAST(s.ts as TIMESTAMP), s.id, s.status, s.stressLevel, CAST(w.ts as TIMESTAMP), w.weight
                 FROM Stress s, Weight w
                 WHERE s.id = w.id
-                AND w.ts BETWEEN s.ts AND s.ts + INTERVAL '10' SECOND
+                AND w.ts BETWEEN s.ts - INTERVAL '5' SECONDS AND s.ts + INTERVAL '5' SECOND
                 """);
         tableList.add(join);
 
@@ -166,14 +166,14 @@ public class Main {
  */
 
         // no ciclo for per questioni di timing con il risultato delle query
-        int i=3;
+        int i=7;
         DataStream<Row> resultStream = tableEnv.toDataStream(tableList.get(i-1));
         DataStream<String> outputStream = resultStream.map(Row::toString);
         //resultStream.print();
         Iterator<String> myOutput = DataStreamUtils.collect(outputStream);
 
-        writeToFile("Files/Output/output"+String.valueOf(i)+".csv",myOutput);
-        //writeToFile("Files/Output/join.csv",myOutput);
+        //writeToFile("Files/Output/output"+String.valueOf(i)+".csv",myOutput);
+        writeToFile("Files/Output/join.csv",myOutput);
 
         /*final FileSink<String> sink = FileSink
                 .forRowFormat(new Path("output"), new SimpleStringEncoder<String>("UTF-8"))
