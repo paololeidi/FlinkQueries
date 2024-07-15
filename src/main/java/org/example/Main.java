@@ -1,9 +1,11 @@
 package org.example;
 
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
+import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.api.common.serialization.SimpleStringSchema;
 import org.apache.flink.connector.kafka.source.KafkaSource;
 import org.apache.flink.connector.kafka.source.enumerator.initializer.OffsetsInitializer;
+import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.DataStreamUtils;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -11,6 +13,8 @@ import org.apache.flink.table.api.Schema;
 import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.types.Row;
+import org.apache.kafka.clients.producer.KafkaProducer;
+import org.apache.kafka.clients.producer.ProducerRecord;
 
 import java.io.FileWriter;
 import java.io.IOException;
@@ -18,8 +22,15 @@ import java.time.*;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.Properties;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class Main {
+    private static final String BOOTSTRAP_SERVER = "localhost:29092";
+    private static final boolean KSQLDB_SINK = true;
+
     public static void main(String[] args) throws Exception {
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
 
@@ -27,7 +38,7 @@ public class Main {
         tableEnv.getConfig().getConfiguration().setString("table.exec.source.idle-timeout", "5000 ms");
 
         KafkaSource<String> stressSource = KafkaSource.<String>builder()
-                .setBootstrapServers("localhost:9092")
+                .setBootstrapServers(BOOTSTRAP_SERVER)
                 .setGroupId("my-group")
                 .setTopics("stress")
                 .setStartingOffsets(OffsetsInitializer.latest())
@@ -49,7 +60,7 @@ public class Main {
         });
 
         Schema stressSchema = Schema.newBuilder()
-                .columnByExpression("ts", "CAST(eventTime AS TIMESTAMP_LTZ(3))")
+                .columnByExpression("ts", "CAST(eventTime AS TIMESTAMP_LTZ(3))") // eventTime is the field of the StressEventClass
                 .columnByExpression("proc_time", "PROCTIME()")
                 .watermark("ts", "ts - INTERVAL '2' SECOND")
                 .build();
@@ -58,7 +69,7 @@ public class Main {
         tableEnv.createTemporaryView("Stress", stressInputTable);
 
         KafkaSource<String> weightSource = KafkaSource.<String>builder()
-                .setBootstrapServers("localhost:9092")
+                .setBootstrapServers(BOOTSTRAP_SERVER)
                 .setGroupId("my-group")
                 .setTopics("weight")
                 .setStartingOffsets(OffsetsInitializer.latest())
@@ -116,7 +127,7 @@ public class Main {
 
         Table table4 = tableEnv.sqlQuery("""
                 SELECT window_start, window_end, id, max(stressLevel) as max_stress
-                FROM table(TUMBLE(table Stress, descriptor(ts), INTERVAL '10' seconds))
+                FROM table(TUMBLE(table Stress, descriptor(ts), INTERVAL '2' seconds))
                 GROUP BY window_start, window_end, id
                 """);
         tableList.add(table4);
@@ -135,6 +146,134 @@ public class Main {
                 """);
         tableList.add(table6);
 
+
+        Table table7 = tableEnv.sqlQuery("""
+                SELECT window_start, window_end, min(stressLevel) as min_stress
+                FROM table(TUMBLE(table Stress, descriptor(ts), INTERVAL '10' seconds))
+                GROUP BY window_start, window_end
+                """);
+        tableList.add(table7);
+
+        Table table8 = tableEnv.sqlQuery("""
+                SELECT window_start, window_end, min(stressLevel) as min_stress
+                FROM table(HOP(table Stress, descriptor(ts), INTERVAL '5' seconds, INTERVAL '10' seconds))
+                GROUP BY window_start, window_end
+                """);
+        tableList.add(table8);
+
+        Table table9 = tableEnv.sqlQuery("""
+                SELECT window_start, window_end,  min(stressLevel) as min_stress
+                FROM table(HOP(table Stress, descriptor(ts), INTERVAL '1' seconds, INTERVAL '10' seconds))
+                GROUP BY window_start, window_end
+                """);
+        tableList.add(table9);
+
+        Table table10 = tableEnv.sqlQuery("""
+                SELECT window_start, window_end, id, min(stressLevel) as min_stress
+                FROM table(TUMBLE(table Stress, descriptor(ts), INTERVAL '10' seconds))
+                GROUP BY window_start, window_end, id
+                """);
+        tableList.add(table10);
+
+        Table table11 = tableEnv.sqlQuery("""
+                SELECT window_start, window_end, id, min(stressLevel) as min_stress
+                FROM table(HOP(table Stress, descriptor(ts), INTERVAL '5' seconds, INTERVAL '10' seconds))
+                GROUP BY window_start, window_end, id
+                """);
+        tableList.add(table11);
+
+        Table table12 = tableEnv.sqlQuery("""
+                SELECT window_start, window_end, id, min(stressLevel) as min_stress
+                FROM table(HOP(table Stress, descriptor(ts), INTERVAL '1' seconds, INTERVAL '10' seconds))
+                GROUP BY window_start, window_end, id
+                """);
+        tableList.add(table12);
+
+        Table table13 = tableEnv.sqlQuery("""
+                SELECT window_start, window_end, avg(weight) as avg_weight
+                FROM table(TUMBLE(table Weight, descriptor(ts), INTERVAL '10' seconds))
+                GROUP BY window_start, window_end
+                """);
+        tableList.add(table13);
+
+        Table table14 = tableEnv.sqlQuery("""
+                SELECT window_start, window_end, avg(weight) as avg_weight
+                FROM table(HOP(table Weight, descriptor(ts), INTERVAL '5' seconds, INTERVAL '10' seconds))
+                GROUP BY window_start, window_end
+                """);
+        tableList.add(table14);
+
+        Table table15 = tableEnv.sqlQuery("""
+                SELECT window_start, window_end,  avg(weight) as avg_weight
+                FROM table(HOP(table Weight, descriptor(ts), INTERVAL '1' seconds, INTERVAL '10' seconds))
+                GROUP BY window_start, window_end
+                """);
+        tableList.add(table15);
+
+        Table table16 = tableEnv.sqlQuery("""
+                SELECT window_start, window_end, id, avg(weight) as avg_weight
+                FROM table(TUMBLE(table Weight, descriptor(ts), INTERVAL '10' seconds))
+                GROUP BY window_start, window_end, id
+                """);
+        tableList.add(table16);
+
+        Table table17 = tableEnv.sqlQuery("""
+                SELECT window_start, window_end, id, avg(weight) as avg_weight
+                FROM table(HOP(table Weight, descriptor(ts), INTERVAL '5' seconds, INTERVAL '10' seconds))
+                GROUP BY window_start, window_end, id
+                """);
+        tableList.add(table17);
+
+        Table table18 = tableEnv.sqlQuery("""
+                SELECT window_start, window_end, id, avg(weight) as avg_weight
+                FROM table(HOP(table Weight, descriptor(ts), INTERVAL '1' seconds, INTERVAL '10' seconds))
+                GROUP BY window_start, window_end, id
+                """);
+        tableList.add(table18);
+
+        Table table19 = tableEnv.sqlQuery("""
+                SELECT window_start, window_end, count(*) as numberOfEvents
+                FROM table(TUMBLE(table Weight, descriptor(ts), INTERVAL '10' seconds))
+                GROUP BY window_start, window_end
+                """);
+        tableList.add(table19);
+
+        Table table20 = tableEnv.sqlQuery("""
+                SELECT window_start, window_end, count(*) as numberOfEvents
+                FROM table(HOP(table Weight, descriptor(ts), INTERVAL '5' seconds, INTERVAL '10' seconds))
+                GROUP BY window_start, window_end
+                """);
+        tableList.add(table20);
+
+        Table table21 = tableEnv.sqlQuery("""
+                SELECT window_start, window_end,  count(*) as numberOfEvents
+                FROM table(HOP(table Weight, descriptor(ts), INTERVAL '1' seconds, INTERVAL '10' seconds))
+                GROUP BY window_start, window_end
+                """);
+        tableList.add(table21);
+
+        Table table22 = tableEnv.sqlQuery("""
+                SELECT window_start, window_end, id, count(*) as numberOfEvents
+                FROM table(TUMBLE(table Weight, descriptor(ts), INTERVAL '10' seconds))
+                GROUP BY window_start, window_end, id
+                """);
+        tableList.add(table22);
+
+        Table table23 = tableEnv.sqlQuery("""
+                SELECT window_start, window_end, id, count(*) as numberOfEvents
+                FROM table(HOP(table Weight, descriptor(ts), INTERVAL '5' seconds, INTERVAL '10' seconds))
+                GROUP BY window_start, window_end, id
+                """);
+        tableList.add(table23);
+
+        Table table24 = tableEnv.sqlQuery("""
+                SELECT window_start, window_end, id, count(*) as numberOfEvents
+                FROM table(HOP(table Weight, descriptor(ts), INTERVAL '1' seconds, INTERVAL '10' seconds))
+                GROUP BY window_start, window_end, id
+                """);
+        tableList.add(table24);
+
+
         Table join = tableEnv.sqlQuery("""
                 SELECT CAST(s.ts as TIMESTAMP), s.id, s.status, s.stressLevel, CAST(w.ts as TIMESTAMP), w.weight
                 FROM Stress s, Weight w
@@ -143,52 +282,15 @@ public class Main {
                 """);
         tableList.add(join);
 
-        /*
-        Table join = tableEnv.sqlQuery("""
-                SELECT *
-                FROM table(HOP(table Stress, descriptor(ts), INTERVAL '1' seconds, INTERVAL '10' seconds))
-                GROUP BY window_start, window_end, id
-                """);
-        tableList.add(table6);
-
-         */
-
-/*
-        for (int i = 1; i < tableList.size(); i++) {
-            DataStream<Row> resultStream = tableEnv.toDataStream(tableList.get(i));
-            DataStream<String> outputStream = resultStream.map(Row::toString);
-            //resultStream.print();
-            Iterator<String> myOutput = DataStreamUtils.collect(outputStream);
-
-            writeToFile("output"+i+".csv",myOutput);
-        }
-
- */
-
-        // no ciclo for per questioni di timing con il risultato delle query
-        int i=7;
-        DataStream<Row> resultStream = tableEnv.toDataStream(tableList.get(i-1));
-        DataStream<String> outputStream = resultStream.map(Row::toString);
+        // Writing output into files/kafka
+        DataStream<Row> resultStream = tableEnv.toDataStream(table4);
+        DataStream<String> flattenResultStream = resultStream.map(Row::toString);
         //resultStream.print();
-        Iterator<String> myOutput = DataStreamUtils.collect(outputStream);
+        Iterator<String> myOutput = DataStreamUtils.collect(flattenResultStream);
 
-        //writeToFile("Files/Output/output"+String.valueOf(i)+".csv",myOutput);
-        writeToFile("Files/Output/join.csv",myOutput);
+        writeToFile("Files/Output/output4.csv",myOutput);
 
-        /*final FileSink<String> sink = FileSink
-                .forRowFormat(new Path("output"), new SimpleStringEncoder<String>("UTF-8"))
-                .withRollingPolicy(
-                        DefaultRollingPolicy.builder()
-                                .withRolloverInterval(Duration.ofMinutes(15))
-                                .withInactivityInterval(Duration.ofMinutes(5))
-                                .withMaxPartSize(MemorySize.ofMebiBytes(1024))
-                                .build())
-                .build();
 
-        outputStream.sinkTo(sink);
-
-        env.execute("test");
-         */
     }
 
     private static void writeToFile(String filename, Iterator<String> myOutput) {
@@ -206,7 +308,6 @@ public class Main {
             } catch (IOException e) {
                 System.out.println("An error occurred while writing to the file: " + e.getMessage());
             }
-             // Adding a newline after each entry
         }
     }
 
