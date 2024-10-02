@@ -123,7 +123,7 @@ public class Main {
 
         Table table3 = tableEnv.sqlQuery("""
                 SELECT window_start, window_end,  max(stressLevel) as max_stress
-                FROM table(HOP(table Stress, descriptor(ts), INTERVAL '1' seconds, INTERVAL '10' seconds))
+                FROM table(SESSION(table Stress, descriptor(ts), INTERVAL '5' seconds))
                 GROUP BY window_start, window_end
                 """);
         tableList.add(table3);
@@ -144,7 +144,7 @@ public class Main {
 
         Table table6 = tableEnv.sqlQuery("""
                 SELECT window_start, window_end, id, max(stressLevel) as max_stress
-                FROM table(HOP(table Stress, descriptor(ts), INTERVAL '1' seconds, INTERVAL '10' seconds))
+                FROM table(SESSION(table Stress, descriptor(ts), INTERVAL '5' seconds))
                 GROUP BY window_start, window_end, id
                 """);
         tableList.add(table6);
@@ -166,7 +166,7 @@ public class Main {
 
         Table table9 = tableEnv.sqlQuery("""
                 SELECT window_start, window_end,  min(stressLevel) as min_stress
-                FROM table(HOP(table Stress, descriptor(ts), INTERVAL '1' seconds, INTERVAL '10' seconds))
+                FROM table(SESSION(table Stress, descriptor(ts), INTERVAL '5' seconds))
                 GROUP BY window_start, window_end
                 """);
         tableList.add(table9);
@@ -187,7 +187,7 @@ public class Main {
 
         Table table12 = tableEnv.sqlQuery("""
                 SELECT window_start, window_end, id, min(stressLevel) as min_stress
-                FROM table(HOP(table Stress, descriptor(ts), INTERVAL '1' seconds, INTERVAL '10' seconds))
+                FROM table(SESSION(table Stress, descriptor(ts), INTERVAL '5' seconds))
                 GROUP BY window_start, window_end, id
                 """);
         tableList.add(table12);
@@ -208,7 +208,7 @@ public class Main {
 
         Table table15 = tableEnv.sqlQuery("""
                 SELECT window_start, window_end,  avg(weight) as avg_weight
-                FROM table(HOP(table Weight, descriptor(ts), INTERVAL '1' seconds, INTERVAL '10' seconds))
+                FROM table(SESSION(table Weight, descriptor(ts), INTERVAL '5' seconds))
                 GROUP BY window_start, window_end
                 """);
         tableList.add(table15);
@@ -229,7 +229,7 @@ public class Main {
 
         Table table18 = tableEnv.sqlQuery("""
                 SELECT window_start, window_end, id, avg(weight) as avg_weight
-                FROM table(HOP(table Weight, descriptor(ts), INTERVAL '1' seconds, INTERVAL '10' seconds))
+                FROM table(SESSION(table Weight, descriptor(ts), INTERVAL '5' seconds))
                 GROUP BY window_start, window_end, id
                 """);
         tableList.add(table18);
@@ -250,7 +250,7 @@ public class Main {
 
         Table table21 = tableEnv.sqlQuery("""
                 SELECT window_start, window_end,  count(*) as numberOfEvents
-                FROM table(HOP(table Weight, descriptor(ts), INTERVAL '1' seconds, INTERVAL '10' seconds))
+                FROM table(SESSION(table Weight, descriptor(ts), INTERVAL '5' seconds))
                 GROUP BY window_start, window_end
                 """);
         tableList.add(table21);
@@ -271,7 +271,7 @@ public class Main {
 
         Table table24 = tableEnv.sqlQuery("""
                 SELECT window_start, window_end, id, count(*) as numberOfEvents
-                FROM table(HOP(table Weight, descriptor(ts), INTERVAL '1' seconds, INTERVAL '10' seconds))
+                FROM table(SESSION(table Weight, descriptor(ts), INTERVAL '5' seconds))
                 GROUP BY window_start, window_end, id
                 """);
         tableList.add(table24);
