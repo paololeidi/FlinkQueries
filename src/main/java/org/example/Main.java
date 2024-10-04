@@ -31,7 +31,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class Main {
-    private static final String BOOTSTRAP_SERVER = "localhost:29092";
+    private static final String BOOTSTRAP_SERVER = "localhost:9092";
     private static final boolean KSQLDB_SINK = true;
 
     public static void main(String[] args) throws Exception {
@@ -112,169 +112,121 @@ public class Main {
                 FROM table(TUMBLE(table Stress, descriptor(ts), INTERVAL '10' seconds))
                 GROUP BY window_start, window_end
                 """);
-        tableList.add(table1);
 
         Table table2 = tableEnv.sqlQuery("""
                 SELECT window_start, window_end, max(stressLevel) as max_stress
                 FROM table(HOP(table Stress, descriptor(ts), INTERVAL '5' seconds, INTERVAL '10' seconds))
                 GROUP BY window_start, window_end
                 """);
-        tableList.add(table2);
 
         Table table3 = tableEnv.sqlQuery("""
-                SELECT window_start, window_end,  max(stressLevel) as max_stress
-                FROM table(SESSION(table Stress, descriptor(ts), INTERVAL '5' seconds))
-                GROUP BY window_start, window_end
-                """);
-        tableList.add(table3);
-
-        Table table4 = tableEnv.sqlQuery("""
                 SELECT window_start, window_end, id, max(stressLevel) as max_stress
                 FROM table(TUMBLE(table Stress, descriptor(ts), INTERVAL '2' seconds))
                 GROUP BY window_start, window_end, id
                 """);
-        tableList.add(table4);
+
+        Table table4 = tableEnv.sqlQuery("""
+                SELECT window_start, window_end, id, max(stressLevel) as max_stress
+                FROM table(HOP(table Stress, descriptor(ts), INTERVAL '5' seconds, INTERVAL '10' seconds))
+                GROUP BY window_start, window_end, id
+                """);
 
         Table table5 = tableEnv.sqlQuery("""
                 SELECT window_start, window_end, id, max(stressLevel) as max_stress
-                FROM table(HOP(table Stress, descriptor(ts), INTERVAL '5' seconds, INTERVAL '10' seconds))
+                FROM table(SESSION(table Stress, descriptor(ts), INTERVAL '3' seconds))
                 GROUP BY window_start, window_end, id
                 """);
-        tableList.add(table5);
+
 
         Table table6 = tableEnv.sqlQuery("""
-                SELECT window_start, window_end, id, max(stressLevel) as max_stress
-                FROM table(SESSION(table Stress, descriptor(ts), INTERVAL '5' seconds))
-                GROUP BY window_start, window_end, id
+                SELECT window_start, window_end, min(stressLevel) as min_stress
+                FROM table(TUMBLE(table Stress, descriptor(ts), INTERVAL '10' seconds))
+                GROUP BY window_start, window_end
                 """);
-        tableList.add(table6);
-
 
         Table table7 = tableEnv.sqlQuery("""
                 SELECT window_start, window_end, min(stressLevel) as min_stress
-                FROM table(TUMBLE(table Stress, descriptor(ts), INTERVAL '10' seconds))
-                GROUP BY window_start, window_end
-                """);
-        tableList.add(table7);
-
-        Table table8 = tableEnv.sqlQuery("""
-                SELECT window_start, window_end, min(stressLevel) as min_stress
                 FROM table(HOP(table Stress, descriptor(ts), INTERVAL '5' seconds, INTERVAL '10' seconds))
                 GROUP BY window_start, window_end
                 """);
-        tableList.add(table8);
+
+        Table table8 = tableEnv.sqlQuery("""
+                SELECT window_start, window_end, id, min(stressLevel) as min_stress
+                FROM table(TUMBLE(table Stress, descriptor(ts), INTERVAL '10' seconds))
+                GROUP BY window_start, window_end, id
+                """);
 
         Table table9 = tableEnv.sqlQuery("""
-                SELECT window_start, window_end,  min(stressLevel) as min_stress
-                FROM table(SESSION(table Stress, descriptor(ts), INTERVAL '5' seconds))
-                GROUP BY window_start, window_end
+                SELECT window_start, window_end, id, min(stressLevel) as min_stress
+                FROM table(HOP(table Stress, descriptor(ts), INTERVAL '5' seconds, INTERVAL '10' seconds))
+                GROUP BY window_start, window_end, id
                 """);
-        tableList.add(table9);
 
         Table table10 = tableEnv.sqlQuery("""
                 SELECT window_start, window_end, id, min(stressLevel) as min_stress
-                FROM table(TUMBLE(table Stress, descriptor(ts), INTERVAL '10' seconds))
+                FROM table(SESSION(table Stress, descriptor(ts), INTERVAL '3' seconds))
                 GROUP BY window_start, window_end, id
                 """);
-        tableList.add(table10);
 
         Table table11 = tableEnv.sqlQuery("""
-                SELECT window_start, window_end, id, min(stressLevel) as min_stress
-                FROM table(HOP(table Stress, descriptor(ts), INTERVAL '5' seconds, INTERVAL '10' seconds))
-                GROUP BY window_start, window_end, id
+                SELECT window_start, window_end, avg(weight) as avg_weight
+                FROM table(TUMBLE(table Weight, descriptor(ts), INTERVAL '10' seconds))
+                GROUP BY window_start, window_end
                 """);
-        tableList.add(table11);
 
         Table table12 = tableEnv.sqlQuery("""
-                SELECT window_start, window_end, id, min(stressLevel) as min_stress
-                FROM table(SESSION(table Stress, descriptor(ts), INTERVAL '5' seconds))
-                GROUP BY window_start, window_end, id
+                SELECT window_start, window_end, avg(weight) as avg_weight
+                FROM table(HOP(table Weight, descriptor(ts), INTERVAL '5' seconds, INTERVAL '10' seconds))
+                GROUP BY window_start, window_end
                 """);
-        tableList.add(table12);
 
         Table table13 = tableEnv.sqlQuery("""
-                SELECT window_start, window_end, avg(weight) as avg_weight
+                SELECT window_start, window_end, id, avg(weight) as avg_weight
                 FROM table(TUMBLE(table Weight, descriptor(ts), INTERVAL '10' seconds))
-                GROUP BY window_start, window_end
+                GROUP BY window_start, window_end, id
                 """);
-        tableList.add(table13);
 
         Table table14 = tableEnv.sqlQuery("""
-                SELECT window_start, window_end, avg(weight) as avg_weight
+                SELECT window_start, window_end, id, avg(weight) as avg_weight
                 FROM table(HOP(table Weight, descriptor(ts), INTERVAL '5' seconds, INTERVAL '10' seconds))
-                GROUP BY window_start, window_end
+                GROUP BY window_start, window_end, id
                 """);
-        tableList.add(table14);
 
         Table table15 = tableEnv.sqlQuery("""
-                SELECT window_start, window_end,  avg(weight) as avg_weight
-                FROM table(SESSION(table Weight, descriptor(ts), INTERVAL '5' seconds))
-                GROUP BY window_start, window_end
+                SELECT window_start, window_end, id, avg(weight) as avg_weight
+                FROM table(SESSION(table Weight, descriptor(ts), INTERVAL '3' seconds))
+                GROUP BY window_start, window_end, id
                 """);
-        tableList.add(table15);
 
         Table table16 = tableEnv.sqlQuery("""
-                SELECT window_start, window_end, id, avg(weight) as avg_weight
+                SELECT window_start, window_end, count(*) as numberOfEvents
                 FROM table(TUMBLE(table Weight, descriptor(ts), INTERVAL '10' seconds))
-                GROUP BY window_start, window_end, id
+                GROUP BY window_start, window_end
                 """);
-        tableList.add(table16);
 
         Table table17 = tableEnv.sqlQuery("""
-                SELECT window_start, window_end, id, avg(weight) as avg_weight
+                SELECT window_start, window_end, count(*) as numberOfEvents
                 FROM table(HOP(table Weight, descriptor(ts), INTERVAL '5' seconds, INTERVAL '10' seconds))
-                GROUP BY window_start, window_end, id
+                GROUP BY window_start, window_end
                 """);
-        tableList.add(table17);
 
         Table table18 = tableEnv.sqlQuery("""
-                SELECT window_start, window_end, id, avg(weight) as avg_weight
-                FROM table(SESSION(table Weight, descriptor(ts), INTERVAL '5' seconds))
+                SELECT window_start, window_end, id, count(*) as numberOfEvents
+                FROM table(TUMBLE(table Weight, descriptor(ts), INTERVAL '10' seconds))
                 GROUP BY window_start, window_end, id
                 """);
-        tableList.add(table18);
 
         Table table19 = tableEnv.sqlQuery("""
-                SELECT window_start, window_end, count(*) as numberOfEvents
-                FROM table(TUMBLE(table Weight, descriptor(ts), INTERVAL '10' seconds))
-                GROUP BY window_start, window_end
+                SELECT window_start, window_end, id, count(*) as numberOfEvents
+                FROM table(HOP(table Weight, descriptor(ts), INTERVAL '5' seconds, INTERVAL '10' seconds))
+                GROUP BY window_start, window_end, id
                 """);
-        tableList.add(table19);
 
         Table table20 = tableEnv.sqlQuery("""
-                SELECT window_start, window_end, count(*) as numberOfEvents
-                FROM table(HOP(table Weight, descriptor(ts), INTERVAL '5' seconds, INTERVAL '10' seconds))
-                GROUP BY window_start, window_end
-                """);
-        tableList.add(table20);
-
-        Table table21 = tableEnv.sqlQuery("""
-                SELECT window_start, window_end,  count(*) as numberOfEvents
-                FROM table(SESSION(table Weight, descriptor(ts), INTERVAL '5' seconds))
-                GROUP BY window_start, window_end
-                """);
-        tableList.add(table21);
-
-        Table table22 = tableEnv.sqlQuery("""
                 SELECT window_start, window_end, id, count(*) as numberOfEvents
-                FROM table(TUMBLE(table Weight, descriptor(ts), INTERVAL '10' seconds))
+                FROM table(SESSION(table Weight, descriptor(ts), INTERVAL '3' seconds))
                 GROUP BY window_start, window_end, id
                 """);
-        tableList.add(table22);
-
-        Table table23 = tableEnv.sqlQuery("""
-                SELECT window_start, window_end, id, count(*) as numberOfEvents
-                FROM table(HOP(table Weight, descriptor(ts), INTERVAL '5' seconds, INTERVAL '10' seconds))
-                GROUP BY window_start, window_end, id
-                """);
-        tableList.add(table23);
-
-        Table table24 = tableEnv.sqlQuery("""
-                SELECT window_start, window_end, id, count(*) as numberOfEvents
-                FROM table(SESSION(table Weight, descriptor(ts), INTERVAL '5' seconds))
-                GROUP BY window_start, window_end, id
-                """);
-        tableList.add(table24);
 
 
         Table join = tableEnv.sqlQuery("""
@@ -286,12 +238,12 @@ public class Main {
         tableList.add(join);
 
         // Writing output into files/kafka
-        DataStream<Row> resultStream = tableEnv.toDataStream(table4);
+        DataStream<Row> resultStream = tableEnv.toDataStream(table6);
         DataStream<String> flattenResultStream = resultStream.map(Row::toString);
         //resultStream.print();
         Iterator<String> myOutput = DataStreamUtils.collect(flattenResultStream);
 
-        writeToFile("Files/Output/output4.csv",myOutput);
+        writeToFile("Files/Output/output6.csv",myOutput);
 
 
     }
