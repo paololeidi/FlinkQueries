@@ -9,8 +9,7 @@ import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMap
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.DataStreamUtils;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
-import org.apache.flink.table.api.Schema;
-import org.apache.flink.table.api.Table;
+import org.apache.flink.table.api.*;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.types.Row;
 import org.apache.kafka.clients.producer.KafkaProducer;
@@ -31,7 +30,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class Main {
-    private static final String BOOTSTRAP_SERVER = "localhost:9092";
+    private static final String BOOTSTRAP_SERVER = "localhost:19092";
     private static final boolean KSQLDB_SINK = true;
 
     public static void main(String[] args) throws Exception {
@@ -121,7 +120,7 @@ public class Main {
 
         Table table3 = tableEnv.sqlQuery("""
                 SELECT window_start, window_end, id, max(stressLevel) as max_stress
-                FROM table(TUMBLE(table Stress, descriptor(ts), INTERVAL '2' seconds))
+                FROM table(TUMBLE(table Stress, descriptor(ts), INTERVAL '10' seconds))
                 GROUP BY window_start, window_end, id
                 """);
 
@@ -131,11 +130,38 @@ public class Main {
                 GROUP BY window_start, window_end, id
                 """);
 
+        tableEnv.executeSql("""
+                CREATE VIEW query5 AS
+                SELECT window_start, window_end, id, max(stressLevel) as max_stress
+                FROM table(SESSION(table Stress, descriptor(ts), INTERVAL '3' seconds))
+                GROUP BY window_start, window_end, id
+                """);
+
+        // create an output Table
+        final Schema schema = Schema.newBuilder()
+                .column("window_start", DataTypes.TIMESTAMP())
+                .column("window_end", DataTypes.TIMESTAMP())
+                .column("id", DataTypes.INT())
+                .column("max_stress", DataTypes.INT())
+                .build();
+
+        tableEnv.createTemporaryTable("CsvSinkTable", TableDescriptor.forConnector("filesystem")
+                .schema(schema)
+                .option("path", "/Files")
+                .format(FormatDescriptor.forFormat("csv")
+                        .option("field-delimiter", ",")
+                        .build())
+                .build());
+
         Table table5 = tableEnv.sqlQuery("""
                 SELECT window_start, window_end, id, max(stressLevel) as max_stress
                 FROM table(SESSION(table Stress, descriptor(ts), INTERVAL '3' seconds))
                 GROUP BY window_start, window_end, id
                 """);
+
+        TablePipeline pipeline = table5.insertInto("CsvSinkTable");
+
+        // pipeline.execute();
 
 
         Table table6 = tableEnv.sqlQuery("""
@@ -238,12 +264,13 @@ public class Main {
         tableList.add(join);
 
         // Writing output into files/kafka
-        DataStream<Row> resultStream = tableEnv.toDataStream(table6);
+
+        DataStream<Row> resultStream = tableEnv.toDataStream(table5);
         DataStream<String> flattenResultStream = resultStream.map(Row::toString);
         //resultStream.print();
         Iterator<String> myOutput = DataStreamUtils.collect(flattenResultStream);
 
-        writeToFile("Files/Output/output6.csv",myOutput);
+        writeToFile("Files/Output/output5.csv",myOutput);
 
 
     }
@@ -280,7 +307,7 @@ public class Main {
             Matcher matcher = timestampPattern.matcher(fields[i]);
             if (matcher.matches()) {
                 System.out.println("change: " + fields[i]);
-                fields[i] = fields[i] + ":00";
+                //fields[i] = fields[i] + ":00";
                 System.out.println("in: " + fields[i]);
             }
         }
